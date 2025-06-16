@@ -1,17 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bell, Search, User, LogOut, Menu, X } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 
-const NotificationItem = ({ id, text, time, orderId, onClick }) => (
-  <Link
-    to={`/orders?filter=${orderId}`}
-    onClick={onClick}
-    className="block px-4 py-3 hover:bg-gray-50 border-b border-gray-100"
-  >
-    <p className="text-sm font-medium text-gray-900">{text}</p>
-    <p className="text-xs text-gray-500">{time}</p>
-  </Link>
-);
+const NotificationItem = ({ id, text, time, onClick, onMarkAsRead }) => {
+  const handleClick = async () => {
+    try {
+      await onMarkAsRead(id); // Marquer comme lu
+      onClick(); // Fermer le menu déroulant
+    } catch (err) {
+      console.error('Erreur lors du marquage comme lu:', err);
+    }
+  };
+
+  return (
+    <Link
+      to={`/notifications?id=${id}`}
+      onClick={handleClick}
+      className="block px-4 py-3 hover:bg-gray-50 border-b border-gray-100"
+    >
+      <p className="text-sm font-medium text-gray-900">{text}</p>
+      <p className="text-xs text-gray-500">{time}</p>
+    </Link>
+  );
+};
 
 const ProfileMenu = () => {
   const navigate = useNavigate();
@@ -28,9 +40,12 @@ const ProfileMenu = () => {
       <div className="px-4 py-2 text-sm font-medium text-gray-700 border-b border-gray-200">
         Administrateur
       </div>
-      <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+      <Link
+        to="/profile"
+        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+      >
         Mon profil
-      </a>
+      </Link>
       <div className="border-t border-gray-100"></div>
       <button
         onClick={handleLogout}
@@ -53,7 +68,7 @@ const Header = ({ toggleSidebar }) => {
   const profileRef = useRef(null);
   const navigate = useNavigate();
 
-  const fetchNotifications = () => {
+  const fetchNotifications = async () => {
     const admin = JSON.parse(localStorage.getItem('admin'));
     if (!admin || !admin.token) {
       console.log('Aucun token admin trouvé dans localStorage:', localStorage.getItem('admin'));
@@ -64,41 +79,68 @@ const Header = ({ toggleSidebar }) => {
 
     console.log('Fetching notifications with token:', admin.token);
     setLoading(true);
-    fetch('http://localhost:5000/admin/notifications', {
-      headers: {
-        'Authorization': `Bearer ${admin.token}`,
-        'Content-Type': 'application/json',
-      },
-    })
-      .then(res => {
-        if (!res.ok) {
-          return res.json().then(errData => {
-            throw new Error(errData.error || `Erreur HTTP: ${res.status}`);
-          });
-        }
-        return res.json();
-      })
-      .then(data => {
-        console.log('Notifications récupérées:', data);
-        setNotifications(data.filter(n => !n.is_read));
-        setError(null);
-      })
-      .catch(err => {
-        console.error('Erreur lors de la récupération des notifications:', err.message);
-        if (err.message.includes('Failed to fetch')) {
-          setError('Impossible de se connecter au serveur. Vérifiez si le serveur est en cours d\'exécution sur http://localhost:5000.');
-        } else {
-          setError(`Erreur: ${err.message}`);
-        }
-      })
-      .finally(() => setLoading(false));
+    try {
+      const response = await axios.get('http://localhost:5000/admin/notifications', {
+        headers: {
+          Authorization: `Bearer ${admin.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Notifications récupérées:', response.data);
+      setNotifications(response.data.notifications.filter(n => !n.is_read));
+      setError(null);
+    } catch (err) {
+      console.error('Erreur lors de la récupération des notifications:', err.message);
+      if (err.message.includes('Network Error')) {
+        setError('Impossible de se connecter au serveur. Vérifiez si le serveur est en cours d\'exécution sur http://localhost:5000.');
+      } else if (err.response?.status === 403 || err.response?.status === 401) {
+        setError('Session invalide. Veuillez vous reconnecter.');
+        localStorage.removeItem('admin');
+        navigate('/login');
+      } else {
+        setError(`Erreur: ${err.message}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId) => {
+    const admin = JSON.parse(localStorage.getItem('admin'));
+    if (!admin || !admin.token) {
+      setError('Accès non autorisé. Veuillez vous connecter.');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      await axios.patch(`http://localhost:5000/admin/notifications/${notificationId}`, {}, {
+        headers: {
+          Authorization: `Bearer ${admin.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Mettre à jour la liste des notifications en supprimant celle qui vient d'être lue
+      setNotifications(notifications.filter(n => n.id !== notificationId));
+    } catch (err) {
+      console.error('Erreur lors du marquage comme lu:', err);
+      if (err.response?.status === 403 || err.response?.status === 401) {
+        setError('Session invalide. Veuillez vous reconnecter.');
+        localStorage.removeItem('admin');
+        navigate('/login');
+      } else {
+        setError(err.response?.data?.msg || 'Erreur lors du marquage comme lu.');
+      }
+    }
   };
 
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -176,16 +218,16 @@ const Header = ({ toggleSidebar }) => {
                         id={notification.id}
                         text={notification.message}
                         time={new Date(notification.created_at).toLocaleString('fr-FR')}
-                        orderId={notification.order_id}
                         onClick={() => setShowNotifications(false)}
+                        onMarkAsRead={handleMarkAsRead}
                       />
                     ))
                   )}
                 </div>
                 {notifications.length > 0 && (
                   <div className="px-4 py-2 text-xs font-medium text-center text-photoshop-orange border-t border-gray-200">
-                    <Link to="/orders" onClick={() => setShowNotifications(false)}>
-                      Voir toutes les commandes
+                    <Link to="/notifications" onClick={() => setShowNotifications(false)}>
+                      Voir toutes les notifications
                     </Link>
                   </div>
                 )}

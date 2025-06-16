@@ -4,71 +4,48 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const StockManagement = () => {
-  const navigate = useNavigate();
   const [stock, setStock] = useState([]);
+  const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({
     reward_id: '',
     name: '',
     quantity_available: '',
     price_tokens: '',
     unit_price_fcfa: '',
+    category: '',
     image: null,
-    category: ''
   });
   const [editItem, setEditItem] = useState(null);
-  const [isAdding, setIsAdding] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const itemsPerPage = 5;
+  const [itemsPerPage] = useState(5);
+  const navigate = useNavigate();
 
-  // Récupérer le stock depuis l'API
+  // Récupérer le token JWT depuis localStorage
+  const token = localStorage.getItem('token'); // Assure-toi que le token est stocké ici après login
+
+  // Configurer axios avec le token
+  const api = axios.create({
+    baseURL: 'http://127.0.0.1:5000',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  // Charger les stocks au montage
   useEffect(() => {
-    const fetchStock = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    fetchStocks();
+  }, []);
 
-        const admin = JSON.parse(localStorage.getItem('admin'));
-        if (!admin || !admin.token) {
-          throw new Error('Aucune donnée admin trouvée dans localStorage. Veuillez vous reconnecter.');
-        }
-
-        const response = await axios.get('http://localhost:5000/admin/stock', {
-          headers: {
-            Authorization: `Bearer ${admin.token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!Array.isArray(response.data)) {
-          throw new Error('Les données de l\'API ne sont pas un tableau.');
-        }
-
-        setStock(response.data);
-      } catch (err) {
-        console.error('Erreur complète:', err);
-        if (err.message === 'Network Error') {
-          setError('Erreur réseau. Vérifiez si le serveur Flask est démarré sur http://localhost:5000.');
-        } else if (err.response) {
-          if (err.response.status === 403) {
-            setError('Accès interdit. Vérifiez vos permissions ou reconnectez-vous.');
-            localStorage.removeItem('admin');
-            navigate('/login');
-          } else if (err.response.status === 404) {
-            setError('Endpoint non trouvé. Vérifiez l\'URL de l\'API.');
-          } else {
-            setError(`Erreur ${err.response.status}: ${err.response.data?.message || 'Erreur inconnue.'}`);
-          }
-        } else {
-          setError(err.message || 'Impossible de charger le stock. Vérifiez le serveur ou votre connexion.');
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStock();
-  }, [navigate]);
+  const fetchStocks = async () => {
+    try {
+      const response = await api.get('/admin/stock');
+      setStock(response.data);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des stocks:', error);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -81,186 +58,95 @@ const StockManagement = () => {
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (editItem) {
-      setEditItem({ ...editItem, image: file });
-    } else {
-      setNewItem({ ...newItem, image: file });
+    if (file) {
+      if (editItem) {
+        setEditItem({ ...editItem, image: file });
+      } else {
+        setNewItem({ ...newItem, image: file });
+      }
+      setImagePreview(URL.createObjectURL(file));
     }
   };
 
   const handleAddItem = async (e) => {
     e.preventDefault();
+    const formData = new FormData();
+    formData.append('reward_id', newItem.reward_id);
+    formData.append('name', newItem.name);
+    formData.append('quantity_available', newItem.quantity_available);
+    formData.append('price_tokens', newItem.price_tokens);
+    formData.append('unit_price_fcfa', newItem.unit_price_fcfa);
+    formData.append('category', newItem.category || '');
+    if (newItem.image) formData.append('image', newItem.image);
+
     try {
-      setError(null);
-      const admin = JSON.parse(localStorage.getItem('admin'));
-      if (!admin || !admin.token) {
-        setError('Aucune donnée admin trouvée dans localStorage. Veuillez vous reconnecter.');
-        navigate('/login');
-        return;
-      }
-
-      if (!newItem.reward_id || !newItem.name || !newItem.quantity_available || !newItem.price_tokens || !newItem.unit_price_fcfa || !newItem.image) {
-        setError('Veuillez remplir tous les champs.');
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('reward_id', Number(newItem.reward_id));
-      formData.append('name', newItem.name);
-      formData.append('quantity_available', Number(newItem.quantity_available));
-      formData.append('price_tokens', Number(newItem.price_tokens));
-      formData.append('unit_price_fcfa', Number(newItem.unit_price_fcfa));
-      formData.append('category', newItem.category || '');
-      formData.append('image', newItem.image);
-
-      const response = await axios.post('http://localhost:5000/admin/stock', formData, {
-        headers: {
-          Authorization: `Bearer ${admin.token}`,
-          'Content-Type': 'multipart/form-data',
-        },
+      const response = await api.post('/admin/stock', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-
-      setStock(prev => [...prev, response.data]);
+      setStock([...stock, response.data]);
+      setIsAdding(false);
       setNewItem({
         reward_id: '',
         name: '',
         quantity_available: '',
         price_tokens: '',
         unit_price_fcfa: '',
+        category: '',
         image: null,
-        category: ''
       });
-      setIsAdding(false);
-    } catch (err) {
-      console.error('Erreur lors de l\'ajout de l\'article:', err);
-      if (err.response) {
-        if (err.response.status === 403) {
-          setError('Accès interdit. Seuls les super admins peuvent ajouter du stock.');
-          localStorage.removeItem('admin');
-          navigate('/login');
-        } else if (err.response.status === 401) {
-          setError('Non autorisé. Le jeton est invalide ou expiré. Reconnectez-vous.');
-          localStorage.removeItem('admin');
-          navigate('/login');
-        } else {
-          setError(`Erreur ${err.response.status}: ${err.response.data?.message || 'Échec de l\'ajout.'}`);
-        }
-      } else {
-        setError(err.message || 'Erreur lors de l\'ajout de l\'article.');
-      }
-    }
-  };
-
-  const handleSaveEdit = async (e) => {
-    e.preventDefault();
-    try {
-      setError(null);
-      const admin = JSON.parse(localStorage.getItem('admin'));
-      if (!admin || !admin.token) {
-        setError('Aucune donnée admin trouvée dans localStorage. Veuillez vous reconnecter.');
-        navigate('/login');
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('name', editItem.name);
-      formData.append('quantity_available', Number(editItem.quantity_available));
-      formData.append('price_tokens', Number(editItem.price_tokens));
-      formData.append('unit_price_fcfa', Number(editItem.unit_price_fcfa));
-      formData.append('category', editItem.category || '');
-      if (editItem.image instanceof File) {
-        formData.append('image', editItem.image);
-      }
-
-      const response = await axios.put(`http://localhost:5000/admin/stock/${editItem.id}`, formData, {
-        headers: {
-          Authorization: `Bearer ${admin.token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      setStock(stock.map(item => item.id === response.data.id ? response.data : item));
-      setEditItem(null);
-    } catch (err) {
-      console.error('Erreur lors de la mise à jour de l\'article:', err);
-      if (err.response) {
-        if (err.response.status === 403) {
-          setError('Accès interdit. Seuls les super admins peuvent modifier le stock.');
-          localStorage.removeItem('admin');
-          navigate('/login');
-        } else if (err.response.status === 401) {
-          setError('Non autorisé. Le jeton est invalide ou expiré. Reconnectez-vous.');
-          localStorage.removeItem('admin');
-          navigate('/login');
-        } else if (err.response.status === 404) {
-          setError('Stock non trouvé.');
-        } else {
-          setError(`Erreur ${err.response.status}: ${err.response.data?.message || 'Échec de la mise à jour.'}`);
-        }
-      } else {
-        setError(err.message || 'Erreur lors de la mise à jour de l\'article.');
-      }
-    }
-  };
-
-  const handleDeleteItem = async (id) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cet article ?')) {
-      try {
-        setError(null);
-        const admin = JSON.parse(localStorage.getItem('admin'));
-        if (!admin || !admin.token) {
-          setError('Aucune donnée admin trouvée dans localStorage. Veuillez vous reconnecter.');
-          navigate('/login');
-          return;
-        }
-
-        const response = await axios.delete(`http://localhost:5000/admin/stock/${id}`, {
-          headers: {
-            Authorization: `Bearer ${admin.token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        setStock(stock.filter(item => item.id !== id));
-      } catch (err) {
-        console.error('Erreur lors de la suppression de l\'article:', err);
-        if (err.response) {
-          if (err.response.status === 403) {
-            setError('Accès interdit. Seuls les super admins peuvent supprimer le stock.');
-            localStorage.removeItem('admin');
-            navigate('/login');
-          } else if (err.response.status === 401) {
-            setError('Non autorisé. Le jeton est invalide ou expiré. Reconnectez-vous.');
-            localStorage.removeItem('admin');
-            navigate('/login');
-          } else if (err.response.status === 404) {
-            setError('Stock non trouvé.');
-          } else {
-            setError(`Erreur ${err.response.status}: ${err.response.data?.message || 'Échec de la suppression.'}`);
-          }
-        } else {
-          setError(err.message || 'Erreur lors de la suppression de l\'article.');
-        }
-      }
+      setImagePreview(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout du stock:', error);
     }
   };
 
   const handleEditItem = (item) => {
-    setEditItem({ ...item, image: null }); // Réinitialiser l'image pour l'édition
+    setEditItem({ ...item, image: null });
+    setImagePreview(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editItem) return;
+
+    const formData = new FormData();
+    formData.append('reward_id', editItem.reward_id);
+    formData.append('name', editItem.name);
+    formData.append('quantity_available', editItem.quantity_available);
+    formData.append('price_tokens', editItem.price_tokens);
+    formData.append('unit_price_fcfa', editItem.unit_price_fcfa);
+    formData.append('category', editItem.category || '');
+    if (editItem.image) formData.append('image', editItem.image);
+
+    try {
+      const response = await api.put(`/admin/stock/${editItem.id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setStock(stock.map(item => (item.id === editItem.id ? response.data : item)));
+      setEditItem(null);
+      setImagePreview(null);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du stock:', error);
+    }
+  };
+
+  const handleDeleteItem = async (stockId) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet article ?')) {
+      try {
+        await api.delete(`/admin/stock/${stockId}`);
+        setStock(stock.filter(item => item.id !== stockId));
+      } catch (error) {
+        console.error('Erreur lors de la suppression du stock:', error);
+      }
+    }
   };
 
   const downloadCSV = () => {
-    const headers = ['ID, Nom, Catégorie, Quantité, Prix (jetons), Prix unitaire (FCFA)'];
-    const rows = paginatedStock.map(item => [
-      item.id,
-      item.name,
-      item.category || '',
-      item.quantity_available,
-      item.price_tokens,
-      item.unit_price_fcfa
-    ].join(','));
-    const csvContent = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const headers = ['ID, Reward ID, Nom, Quantité, Prix (jetons), Prix unitaire (FCFA), Catégorie, Image URL'];
+    const rows = stock.map(item =>
+      `${item.id}, ${item.reward_id}, "${item.name}", ${item.quantity_available}, ${item.price_tokens}, ${item.unit_price_fcfa}, "${item.category || ''}", "${item.image_url || ''}"`
+    );
+    const csv = [headers, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -269,109 +155,128 @@ const StockManagement = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const totalPages = Math.ceil(stock.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedStock = stock.slice(startIndex, startIndex + itemsPerPage);
-
-  if (loading) return <div className="p-6 text-center text-gray-600">Chargement...</div>;
-  if (error) return (
-    <div className="p-6 text-center text-red-600">
-      {error}
-      <Link to="/login" className="ml-2 text-indigo-600 hover:text-indigo-900">Se connecter</Link>
-    </div>
-  );
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedStock = stock.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(stock.length / itemsPerPage);
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-photoshop-jaune">Gestion des stocks</h1>
+      <h1 className="text-3xl font-semibold text-gray-800 mb-6">Gestion des stocks</h1>
 
-      <div className="flex justify-between items-center mt-4">
-        <button 
-          onClick={() => setIsAdding(!isAdding)} 
-          className="px-6 py-2 bg-[#5c669a] text-white rounded hover:bg-[#262e55]"
+      <div className="flex justify-between items-center mb-6">
+        <button
+          onClick={() => setIsAdding(!isAdding)}
+          className="px-6 py-2 bg-[#5c669a] text-white rounded hover:bg-[#262e55] transition duration-200"
         >
           Ajouter un article
         </button>
         <button
           onClick={downloadCSV}
-          className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition duration-200"
         >
           Télécharger CSV
         </button>
       </div>
 
       {isAdding && (
-        <form onSubmit={handleAddItem} className="bg-white p-6 rounded-lg shadow-lg mt-6" encType="multipart/form-data">
+        <form onSubmit={handleAddItem} className="bg-white p-6 rounded-lg shadow-lg mb-6" encType="multipart/form-data">
           <h2 className="text-xl font-semibold text-gray-700 mb-4">Ajouter un nouvel article</h2>
           <div className="space-y-4">
-            <input
-              type="number"
-              name="reward_id"
-              placeholder="ID de la récompense"
-              value={newItem.reward_id}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-            <input
-              type="text"
-              name="name"
-              placeholder="Nom de l'article"
-              value={newItem.name}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-            <input
-              type="number"
-              name="quantity_available"
-              placeholder="Quantité"
-              value={newItem.quantity_available}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-            <input
-              type="number"
-              name="price_tokens"
-              step="0.01"
-              placeholder="Prix (jetons)"
-              value={newItem.price_tokens}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-            <input
-              type="number"
-              name="unit_price_fcfa"
-              step="0.01"
-              placeholder="Prix unitaire (FCFA)"
-              value={newItem.unit_price_fcfa}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-            <input
-              type="text"
-              name="category"
-              placeholder="Catégorie"
-              value={newItem.category}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="file"
-              name="image"
-              accept="image/png, image/jpeg, image/gif"
-              onChange={handleImageChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-600">ID de la récompense</label>
+              <input
+                type="number"
+                name="reward_id"
+                placeholder="ID de la récompense"
+                value={newItem.reward_id}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Nom de l'article</label>
+              <input
+                type="text"
+                name="name"
+                placeholder="Nom de l'article"
+                value={newItem.name}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Quantité</label>
+              <input
+                type="number"
+                name="quantity_available"
+                placeholder="Quantité"
+                value={newItem.quantity_available}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Prix (jetons)</label>
+              <input
+                type="number"
+                name="price_tokens"
+                step="0.01"
+                placeholder="Prix (jetons)"
+                value={newItem.price_tokens}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Prix unitaire (FCFA)</label>
+              <input
+                type="number"
+                name="unit_price_fcfa"
+                step="0.01"
+                placeholder="Prix unitaire (FCFA)"
+                value={newItem.unit_price_fcfa}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Catégorie (optionnel)</label>
+              <input
+                type="text"
+                name="category"
+                placeholder="Catégorie"
+                value={newItem.category}
+                onChange={handleInputChange}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600">Image</label>
+              <input
+                type="file"
+                name="image"
+                accept="image/png, image/jpeg, image/gif"
+                onChange={handleImageChange}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+              {imagePreview && (
+                <div className="mt-2">
+                  <img src={imagePreview} alt="Aperçu" className="h-20 w-20 object-cover rounded" />
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex justify-end mt-4">
             <button
               type="submit"
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
             >
               <Plus size={18} className="mr-2" />
               Ajouter
@@ -380,11 +285,7 @@ const StockManagement = () => {
         </form>
       )}
 
-      {stock.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg shadow-md mt-6">
-          <p className="text-gray-500">Aucun stock disponible pour le moment.</p>
-        </div>
-      ) : (
+      
         <div className="mt-6 bg-white rounded-lg shadow-md">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -403,13 +304,20 @@ const StockManagement = () => {
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editItem?.id === item.id ? (
-                      <input
-                        type="file"
-                        name="image"
-                        accept="image/png, image/jpeg, image/gif"
-                        onChange={handleImageChange}
-                        className="p-2 border rounded"
-                      />
+                      <div>
+                        <input
+                          type="file"
+                          name="image"
+                          accept="image/png, image/jpeg, image/gif"
+                          onChange={handleImageChange}
+                          className="p-2 border rounded"
+                        />
+                        {imagePreview && (
+                          <div className="mt-2">
+                            <img src={imagePreview} alt="Aperçu" className="h-10 w-10 object-cover rounded" />
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <img
                         src={`http://localhost:5000${item.image_url}`}
@@ -426,7 +334,7 @@ const StockManagement = () => {
                         name="name"
                         value={editItem.name}
                         onChange={handleInputChange}
-                        className="p-2 border rounded"
+                        className="p-2 border rounded w-full"
                       />
                     ) : (
                       <div className="text-sm text-gray-900">{item.name}</div>
@@ -439,7 +347,7 @@ const StockManagement = () => {
                         name="category"
                         value={editItem.category || ''}
                         onChange={handleInputChange}
-                        className="p-2 border rounded"
+                        className="p-2 border rounded w-full"
                       />
                     ) : (
                       <div className="text-sm text-gray-900">{item.category || 'N/A'}</div>
@@ -452,7 +360,7 @@ const StockManagement = () => {
                         name="quantity_available"
                         value={editItem.quantity_available}
                         onChange={handleInputChange}
-                        className="p-2 border rounded"
+                        className="p-2 border rounded w-full"
                       />
                     ) : (
                       <div className="text-sm text-gray-900">{item.quantity_available}</div>
@@ -466,7 +374,7 @@ const StockManagement = () => {
                         step="0.01"
                         value={editItem.price_tokens}
                         onChange={handleInputChange}
-                        className="p-2 border rounded"
+                        className="p-2 border rounded w-full"
                       />
                     ) : (
                       <div className="text-sm text-gray-900">{item.price_tokens}</div>
@@ -480,7 +388,7 @@ const StockManagement = () => {
                         step="0.01"
                         value={editItem.unit_price_fcfa}
                         onChange={handleInputChange}
-                        className="p-2 border rounded"
+                        className="p-2 border rounded w-full"
                       />
                     ) : (
                       <div className="text-sm text-gray-900">{item.unit_price_fcfa} FCFA</div>
@@ -505,7 +413,7 @@ const StockManagement = () => {
             </tbody>
           </table>
         </div>
-      )}
+      
 
       <div className="flex justify-between items-center mt-4">
         <div className="text-sm text-gray-600">
