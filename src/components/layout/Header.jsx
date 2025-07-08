@@ -1,254 +1,138 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Search, User, LogOut, Menu, X } from 'lucide-react';
-import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import { Bell, LogOut, Menu, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import witti_logo from '../../assets/witti_logo_2.jpg';
+import { apiFetch } from '../../api/api';
 
-const NotificationItem = ({ id, text, time, onClick, onMarkAsRead }) => {
-  const handleClick = async () => {
-    try {
-      await onMarkAsRead(id); // Marquer comme lu
-      onClick(); // Fermer le menu déroulant
-    } catch (err) {
-      console.error('Erreur lors du marquage comme lu:', err);
-    }
-  };
-
-  return (
-    <Link
-      to={`/notifications?id=${id}`}
-      onClick={handleClick}
-      className="block px-4 py-3 hover:bg-gray-50 border-b border-gray-100"
-    >
-      <p className="text-sm font-medium text-gray-900">{text}</p>
-      <p className="text-xs text-gray-500">{time}</p>
-    </Link>
-  );
-};
-
-const ProfileMenu = () => {
+const Header = ({ toggleSidebar }) => {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [showProfile, setShowProfile] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    // Récupère le nombre de notifications non lues
+    const fetchUnread = async () => {
+      try {
+        const token = localStorage.getItem('admin') ? JSON.parse(localStorage.getItem('admin')).token : null;
+        if (!token) return;
+        const data = await apiFetch('/admin/notifications', { token });
+        const notifications = Array.isArray(data.notifications) ? data.notifications : [];
+        setUnreadCount(notifications.filter(n => n.is_read === false).length);
+      } catch (e) {
+        setUnreadCount(0);
+      }
+    };
+    fetchUnread();
+  }, []);
 
   const handleLogout = () => {
-    console.log('Logging out');
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('admin');
+    logout();
     navigate('/login', { replace: true });
   };
 
   return (
-    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200">
-      <div className="px-4 py-2 text-sm font-medium text-gray-700 border-b border-gray-200">
-        Administrateur
-      </div>
-      <Link
-        to="/profile"
-        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-      >
-        Mon profil
-      </Link>
-      <div className="border-t border-gray-100"></div>
-      <button
-        onClick={handleLogout}
-        className="flex items-center w-full text-left px-4 py-2 text-sm text-photoshop-orange hover:bg-gray-100"
-      >
-        <LogOut size={16} className="mr-2" />
-        Déconnexion
-      </button>
-    </div>
-  );
-};
-
-const Header = ({ toggleSidebar }) => {
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const notificationsRef = useRef(null);
-  const profileRef = useRef(null);
-  const navigate = useNavigate();
-
-  const fetchNotifications = async () => {
-    const admin = JSON.parse(localStorage.getItem('admin'));
-    if (!admin || !admin.token) {
-      console.log('Aucun token admin trouvé dans localStorage:', localStorage.getItem('admin'));
-      setError('Token manquant. Veuillez vous reconnecter.');
-      setLoading(false);
-      return;
-    }
-
-    console.log('Fetching notifications with token:', admin.token);
-    setLoading(true);
-    try {
-      const response = await axios.get('http://localhost:5000/admin/notifications', {
-        headers: {
-          Authorization: `Bearer ${admin.token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('Notifications récupérées:', response.data);
-      setNotifications(response.data.notifications.filter(n => !n.is_read));
-      setError(null);
-    } catch (err) {
-      console.error('Erreur lors de la récupération des notifications:', err.message);
-      if (err.message.includes('Network Error')) {
-        setError('Impossible de se connecter au serveur. Vérifiez si le serveur est en cours d\'exécution sur http://localhost:5000.');
-      } else if (err.response?.status === 403 || err.response?.status === 401) {
-        setError('Session invalide. Veuillez vous reconnecter.');
-        localStorage.removeItem('admin');
-        navigate('/login');
-      } else {
-        setError(`Erreur: ${err.message}`);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMarkAsRead = async (notificationId) => {
-    const admin = JSON.parse(localStorage.getItem('admin'));
-    if (!admin || !admin.token) {
-      setError('Accès non autorisé. Veuillez vous connecter.');
-      navigate('/login');
-      return;
-    }
-
-    try {
-      await axios.patch(`http://localhost:5000/admin/notifications/${notificationId}`, {}, {
-        headers: {
-          Authorization: `Bearer ${admin.token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      // Mettre à jour la liste des notifications en supprimant celle qui vient d'être lue
-      setNotifications(notifications.filter(n => n.id !== notificationId));
-    } catch (err) {
-      console.error('Erreur lors du marquage comme lu:', err);
-      if (err.response?.status === 403 || err.response?.status === 401) {
-        setError('Session invalide. Veuillez vous reconnecter.');
-        localStorage.removeItem('admin');
-        navigate('/login');
-      } else {
-        setError(err.response?.data?.msg || 'Erreur lors du marquage comme lu.');
-      }
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [navigate]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
-        setShowNotifications(false);
-      }
-      if (profileRef.current && !profileRef.current.contains(event.target)) {
-        setShowProfileMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  return (
-    <header className="bg-white border-b border-gray-200 h-16 shadow-sm z-20">
-      <div className="flex items-center justify-between h-full px-4">
-        <div className="flex items-center">
-          <button 
-            onClick={toggleSidebar}
-            className="p-2 rounded-md text-gray-500 hover:text-photoshop-orange hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-photoshop-orange md:hidden"
-            aria-label="Toggle sidebar"
-          >
-            <Menu size={24} />
-          </button>
-          
-          <div className="relative flex-1 ml-4 max-w-md">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Search size={20} className="text-gray-400" />
-            </div>
-            <input
-              type="search"
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-photoshop-orange focus:border-photoshop-orange"
-              placeholder="Rechercher..."
-            />
-          </div>
-        </div>
+    <header className="bg-white/80 backdrop-blur-xl shadow-lg border-b border-white/20 h-20 flex items-center px-6 z-20 sticky top-0">
+      <div className="flex items-center gap-6 flex-1">
+        <button
+          onClick={toggleSidebar}
+          className="p-3 rounded-2xl text-gray-600 hover:text-purple-600 hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 focus:outline-none md:hidden transition-all duration-300"
+          aria-label="Ouvrir la navigation"
+        >
+          <Menu size={24} />
+        </button>
         
-        <div className="flex items-center space-x-4">
-          <div className="relative" ref={notificationsRef}>
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 text-gray-500 rounded-full hover:text-photoshop-orange hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-photoshop-orange relative"
-            >
-              <Bell size={20} />
-              {notifications.length > 0 && (
-                <span className="absolute top-0 right-0 h-5 w-5 bg-photoshop-orange rounded-full flex items-center justify-center text-xs text-white">
-                  {notifications.length}
-                </span>
-              )}
-            </button>
-            
-            {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                <div className="px-4 py-2 text-sm font-medium text-gray-700 border-b border-gray-200 flex justify-between items-center">
-                  <span>Notifications</span>
-                  <button onClick={() => setShowNotifications(false)} className="text-gray-500 hover:text-gray-700">
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="max-h-60 overflow-y-auto">
-                  {loading ? (
-                    <div className="p-4 text-gray-500 text-center">Chargement...</div>
-                  ) : error ? (
-                    <div className="p-4 text-red-500">{error}</div>
-                  ) : notifications.length === 0 ? (
-                    <div className="p-4 text-gray-500 text-center">
-                      Aucune notification pour le moment.
-                    </div>
-                  ) : (
-                    notifications.map(notification => (
-                      <NotificationItem
-                        key={notification.id}
-                        id={notification.id}
-                        text={notification.message}
-                        time={new Date(notification.created_at).toLocaleString('fr-FR')}
-                        onClick={() => setShowNotifications(false)}
-                        onMarkAsRead={handleMarkAsRead}
-                      />
-                    ))
-                  )}
-                </div>
-                {notifications.length > 0 && (
-                  <div className="px-4 py-2 text-xs font-medium text-center text-photoshop-orange border-t border-gray-200">
-                    <Link to="/notifications" onClick={() => setShowNotifications(false)}>
-                      Voir toutes les notifications
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
+        {/* Logo et titre */}
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <img src={witti_logo} alt="Logo MyWitti" className="h-12 w-auto drop-shadow-lg hidden sm:block border-radius-50" />
+            <div className="absolute -inset-2 bg-gradient-to-r from-purple-400/20 to-blue-400/20 rounded-full blur-xl" />
           </div>
-          
-          <div className="relative" ref={profileRef}>
-            <button 
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="flex items-center text-gray-500 hover:text-photoshop-orange focus:outline-none focus:ring-2 focus:ring-photoshop-orange"
-            >
-              <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                <User size={20} className="text-gray-500" />
-              </div>
-            </button>
-            
-            {showProfileMenu && <ProfileMenu />}
+          <div className="hidden sm:block">
+            <h1 className="font-bold text-2xl bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              MyWitti
+            </h1>
+            <p className="text-xs text-gray-500">Administration Panel</p>
           </div>
         </div>
       </div>
+
+      {/* Actions utilisateur */}
+      <div className="flex items-center gap-4">
+        {/* Bouton notifications */}
+        <button
+          className="relative p-3 rounded-2xl hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 text-gray-600 hover:text-purple-600 focus:outline-none transition-all duration-300 group"
+          onClick={() => navigate('/admin/notifications')}
+        >
+          <Bell size={22} className="transition-transform duration-300 group-hover:scale-110" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full px-2 py-1 font-bold shadow-lg animate-pulse">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* Menu profil */}
+        <div className="relative">
+          <button
+            onClick={() => setShowProfile((v) => !v)}
+            className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-gradient-to-r from-purple-50 to-blue-50 hover:from-purple-100 hover:to-blue-100 border border-white/50 text-gray-700 font-medium focus:outline-none transition-all duration-300 hover:shadow-lg"
+          >
+            <span className="hidden sm:block">{user?.name || 'Admin'}</span>
+            <div className="relative">
+              <img
+                src={witti_logo}
+                alt="Avatar"
+                className="w-10 h-10 rounded-full border-2 border-white shadow-lg object-contain"
+              />
+              <div className="absolute -inset-1 bg-gradient-to-r from-purple-400/30 to-blue-400/30 rounded-full blur-sm" />
+            </div>
+          </button>
+
+          {/* Menu déroulant */}
+          {showProfile && (
+            <div className="absolute right-0 mt-3 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 z-30 animate-fade-in-up overflow-hidden">
+              {/* Header du menu */}
+              <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-purple-50/50 to-blue-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white font-semibold text-sm">
+                      {user?.name?.charAt(0) || 'A'}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-800">{user?.name || 'Admin'}</p>
+                    <p className="text-sm text-gray-500 capitalize">{user?.role || 'admin'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Options du menu */}
+              <div className="py-2">
+                <button
+                  onClick={() => { navigate('/admin/profile'); setShowProfile(false); }}
+                  className="w-full flex items-center gap-3 px-6 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 transition-all duration-200"
+                >
+                  <User size={18} className="text-purple-600" />
+                  <span>Mon Profil</span>
+                </button>
+                
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-6 py-3 text-red-600 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all duration-200"
+                >
+                  <LogOut size={18} />
+                  <span>Déconnexion</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Effet de bordure lumineuse */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-400/30 to-transparent" />
     </header>
   );
 };

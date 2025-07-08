@@ -1,100 +1,180 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { format } from 'date-fns';
-import { FaSpinner } from 'react-icons/fa';
+import { ShoppingCart, CheckCircle, XCircle, Eye, RefreshCw } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../api/api';
+import PageHeader from '../components/common/PageHeader';
+import ModernTable from '../components/common/ModernTable';
+import StatusBadge from '../components/common/StatusBadge';
+
+const statusMap = {
+  pending: { label: 'En attente', type: 'warning' },
+  validated: { label: 'Validée', type: 'success' },
+  cancelled: { label: 'Annulée', type: 'error' },
+};
 
 const OrderManagement = () => {
+  const { token, user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => { fetchOrders(); }, [token]);
 
   const fetchOrders = async () => {
+    setLoading(true); setError('');
     try {
-      const response = await axios.get('/api/orders'); // changez cette URL si besoin
-      setOrders(response.data.orders || []);
-      setLoading(false);
+      const data = await apiFetch('/admin/orders', { token });
+      setOrders(Array.isArray(data.orders) ? data.orders : []);
     } catch (err) {
-      setError("Erreur lors du chargement des commandes");
-      setLoading(false);
+      setError(err?.data?.msg || err?.data?.error || err?.message || 'Erreur lors du chargement.');
+    } finally { setLoading(false); }
+  };
+
+  const handleValidate = async (order) => {
+    if (!window.confirm('Valider cette commande ?')) return;
+    try {
+      await apiFetch(`/admin/orders/${order.id}/validate`, { 
+        method: 'PUT', 
+        token
+      });
+      fetchOrders();
+    } catch (err) {
+      setError(err?.data?.msg || err?.data?.error || err?.message || 'Erreur lors de la validation.');
     }
   };
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  const handleCancel = async (order) => {
+    if (!window.confirm('Annuler cette commande ?')) return;
+    try {
+      await apiFetch(`/admin/orders/${order.id}/cancel`, { 
+        method: 'PUT', 
+        token
+      });
+      fetchOrders();
+    } catch (err) {
+      setError(err?.data?.msg || err?.data?.error || err?.message || 'Erreur lors de l\'annulation.');
+    }
+  };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <FaSpinner className="animate-spin text-gray-500 text-3xl" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className="text-red-600 text-center mt-4">{error}</div>;
-  }
+  // Tri : commandes en attente d'abord, traitées ensuite
+  const sortedOrders = [...orders].sort((a, b) => {
+    if (a.status === 'pending' && b.status !== 'pending') return -1;
+    if (a.status !== 'pending' && b.status === 'pending') return 1;
+    return 0;
+  });
+  // Recherche et pagination
+  const filtered = sortedOrders.filter(o =>
+    o.id?.toString().includes(search) ||
+    o.status?.toLowerCase().includes(search.toLowerCase()) ||
+    o.amount?.toString().includes(search) ||
+    o.date?.toLowerCase().includes(search.toLowerCase()) ||
+    o.customer_id?.toString().includes(search) ||
+    (o.items && o.items.some(item => item.libelle?.toLowerCase().includes(search.toLowerCase())))
+  );
+  const itemsPerPage = 8;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-semibold mb-4">Gestion des commandes</h2>
-      <div className="overflow-x-auto">
-        <table className="min-w-full table-auto border border-gray-300 rounded-lg overflow-hidden">
-          <thead className="bg-gray-100 text-gray-700">
-            <tr>
-              <th className="px-4 py-2 text-left">Image</th>
-              <th className="px-4 py-2 text-left">Récompense</th>
-              <th className="px-4 py-2 text-left">Prix (Jetons)</th>
-              <th className="px-4 py-2 text-left">Quantité</th>
-              <th className="px-4 py-2 text-left">Total</th>
-              <th className="px-4 py-2 text-left">Client</th>
-              <th className="px-4 py-2 text-left">Date</th>
-              <th className="px-4 py-2 text-left">Statut</th>
-              <th className="px-4 py-2 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.length === 0 ? (
-              <tr>
-                <td colSpan="9" className="text-center py-4">Aucune commande disponible.</td>
-              </tr>
-            ) : (
-              orders.map((order, index) => (
-                <tr key={index} className="border-t">
-                  <td className="px-4 py-2">
-                    <img
-                      src={order.image_url || '/placeholder.jpg'}
-                      alt="Récompense"
-                      className="w-12 h-12 object-cover rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-2">{order.recompense || 'N/A'}</td>
-                  <td className="px-4 py-2">{order.prix_jetons}</td>
-                  <td className="px-4 py-2">{order.quantite}</td>
-                  <td className="px-4 py-2">{order.total}</td>
-                  <td className="px-4 py-2">{order.nom_client}</td>
-                  <td className="px-4 py-2">{format(new Date(order.date), 'dd/MM/yyyy HH:mm')}</td>
-                  <td className="px-4 py-2">
-                    <span className={`px-2 py-1 rounded text-white text-sm ${order.statut === 'validé' ? 'bg-green-500' : 'bg-yellow-500'}`}>
-                      {order.statut}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 space-x-2">
-                    <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
-                      Voir
-                    </button>
-                    <button className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">
-                      Supprimer
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+    <div className="max-w-7xl mx-auto w-full animate-fade-in-up">
+      <PageHeader
+        title="Gestion des commandes"
+        description="Validez, annulez ou consultez les commandes des clients."
+        icon={ShoppingCart}
+        gradient="from-gray-700 to-gray-900"
+      >
+        <button
+          onClick={() => { setRefreshing(true); fetchOrders().then(() => setRefreshing(false)); }}
+          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold shadow flex items-center gap-2"
+        >
+          <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} /> Rafraîchir
+        </button>
+      </PageHeader>
+      <div className="mb-4 flex flex-col md:flex-row md:items-center gap-2">
+        <input
+          type="text"
+          placeholder="Rechercher par ID, statut, montant, date..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          className="w-full md:w-72 px-4 py-2 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        />
+      </div>
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">{error}</div>}
+      <ModernTable
+        headers={["ID", "Client", "Articles", "Montant", "Statut", "Date", "Actions"]}
+        loading={loading}
+        emptyMessage="Aucune commande trouvée."
+      >
+        {paginated.map(order => (
+          <tr key={order.id}>
+            <td className="px-6 py-4">{order.id}</td>
+            <td className="px-6 py-4">
+              <a
+                href={`/admin/users/${order.customer_id}`}
+                className="text-blue-600 hover:underline font-semibold"
+              >
+                {`Client #${order.customer_id}`}
+              </a>
+            </td>
+            <td className="px-6 py-4">
+              {order.items && order.items.length > 0 ? (
+                <ul className="space-y-1">
+                  {order.items.map((item, idx) => (
+                    <li key={idx}>
+                      <span className="font-medium">{item.libelle}</span> <span className="text-gray-500">x{item.quantity}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="text-gray-400 italic">Aucun article</span>
+              )}
+            </td>
+            <td className="px-6 py-4">{order.amount} jetons</td>
+            <td className="px-6 py-4">
+              <StatusBadge status={statusMap[order.status]?.label || order.status} type={statusMap[order.status]?.type || 'default'} />
+            </td>
+            <td className="px-6 py-4">{order.date}</td>
+            <td className="px-6 py-4 flex gap-2">
+              <button 
+                onClick={() => handleValidate(order)} 
+                disabled={order.status === 'validated' || order.status === 'cancelled'}
+                className={`${order.status === 'validated' || order.status === 'cancelled' 
+                  ? 'text-gray-400 cursor-not-allowed' 
+                  : 'text-green-600 hover:underline'}`} 
+                title={order.status === 'validated' ? 'Déjà validée' : order.status === 'cancelled' ? 'Commande annulée' : 'Valider'}
+              >
+                <CheckCircle size={18} />
+              </button>
+              <button 
+                onClick={() => handleCancel(order)} 
+                disabled={order.status === 'validated' || order.status === 'cancelled'}
+                className={`${order.status === 'validated' || order.status === 'cancelled' 
+                  ? 'text-gray-400 cursor-not-allowed' 
+                  : 'text-red-600 hover:underline'}`} 
+                title={order.status === 'validated' ? 'Commande validée' : order.status === 'cancelled' ? 'Déjà annulée' : 'Annuler'}
+              >
+                <XCircle size={18} />
+              </button>
+            </td>
+          </tr>
+        ))}
+      </ModernTable>
+      <div className="flex justify-center mt-6 gap-2">
+        {Array.from({ length: totalPages }, (_, i) => (
+          <button
+            key={i}
+            onClick={() => setPage(i + 1)}
+            className={`px-3 py-1 rounded ${page === i + 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          >
+            {i + 1}
+          </button>
+        ))}
       </div>
     </div>
   );
 };
 
-export default OrderManagement;
+export default OrderManagement; 

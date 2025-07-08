@@ -1,445 +1,162 @@
-import { useEffect, useState } from 'react';
-import { Plus, Trash2, Edit, Check } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React, { useEffect, useState } from 'react';
+import { Plus, Edit, Trash2, Package, AlertTriangle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../api/api';
+import PageHeader from '../components/common/PageHeader';
+import ModernTable from '../components/common/ModernTable';
+import ModernModal from '../components/common/ModernModal';
+import StatusBadge from '../components/common/StatusBadge';
 
 const StockManagement = () => {
+  const { token } = useAuth();
   const [stock, setStock] = useState([]);
-  const [isAdding, setIsAdding] = useState(false);
-  const [newItem, setNewItem] = useState({
-    reward_id: '',
-    name: '',
-    quantity_available: '',
-    price_tokens: '',
-    unit_price_fcfa: '',
-    category: '',
-    image: null,
-  });
-  const [editItem, setEditItem] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
-  const navigate = useNavigate();
-
-  // Récupérer le token JWT depuis localStorage
-  const token = localStorage.getItem('token'); // Assure-toi que le token est stocké ici après login
-
-  // Configurer axios avec le token
-  const api = axios.create({
-    baseURL: 'http://127.0.0.1:5000',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'multipart/form-data',
-    },
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [current, setCurrent] = useState(null);
+  const [form, setForm] = useState({
+    libelle: '', jetons: '', stock: '', category_id: '', image_url: ''
   });
 
-  // Charger les stocks au montage
-  useEffect(() => {
-    fetchStocks();
-  }, []);
+  useEffect(() => { fetchStock(); }, [token]);
 
-  const fetchStocks = async () => {
+  const fetchStock = async () => {
+    setLoading(true); setError('');
     try {
-      const response = await api.get('/admin/stock');
-      setStock(response.data);
-    } catch (error) {
-      console.error('Erreur lors de la récupération des stocks:', error);
-    }
+      const data = await apiFetch('/admin/stock', { token });
+      setStock(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err?.data?.msg || err?.data?.error || err?.message || 'Erreur lors du chargement.');
+    } finally { setLoading(false); }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    if (editItem) {
-      setEditItem({ ...editItem, [name]: value });
-    } else {
-      setNewItem({ ...newItem, [name]: value });
-    }
-  };
+  const openAdd = () => { setIsEditing(false); setForm({ libelle: '', jetons: '', stock: '', category_id: '', image_url: '' }); setShowModal(true); };
+  const openEdit = (item) => { setIsEditing(true); setCurrent(item); setForm({ ...item }); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setCurrent(null); setForm({ libelle: '', jetons: '', stock: '', category_id: '', image_url: '' }); };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (editItem) {
-        setEditItem({ ...editItem, image: file });
-      } else {
-        setNewItem({ ...newItem, image: file });
-      }
-      setImagePreview(URL.createObjectURL(file));
-    }
-  };
+  const handleChange = (e) => { setForm({ ...form, [e.target.name]: e.target.value }); };
 
-  const handleAddItem = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const formData = new FormData();
-    formData.append('reward_id', newItem.reward_id);
-    formData.append('name', newItem.name);
-    formData.append('quantity_available', newItem.quantity_available);
-    formData.append('price_tokens', newItem.price_tokens);
-    formData.append('unit_price_fcfa', newItem.unit_price_fcfa);
-    formData.append('category', newItem.category || '');
-    if (newItem.image) formData.append('image', newItem.image);
-
     try {
-      const response = await api.post('/admin/stock', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setStock([...stock, response.data]);
-      setIsAdding(false);
-      setNewItem({
-        reward_id: '',
-        name: '',
-        quantity_available: '',
-        price_tokens: '',
-        unit_price_fcfa: '',
-        category: '',
-        image: null,
-      });
-      setImagePreview(null);
-    } catch (error) {
-      console.error('Erreur lors de l\'ajout du stock:', error);
-    }
-  };
-
-  const handleEditItem = (item) => {
-    setEditItem({ ...item, image: null });
-    setImagePreview(null);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editItem) return;
-
-    const formData = new FormData();
-    formData.append('reward_id', editItem.reward_id);
-    formData.append('name', editItem.name);
-    formData.append('quantity_available', editItem.quantity_available);
-    formData.append('price_tokens', editItem.price_tokens);
-    formData.append('unit_price_fcfa', editItem.unit_price_fcfa);
-    formData.append('category', editItem.category || '');
-    if (editItem.image) formData.append('image', editItem.image);
-
-    try {
-      const response = await api.put(`/admin/stock/${editItem.id}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setStock(stock.map(item => (item.id === editItem.id ? response.data : item)));
-      setEditItem(null);
-      setImagePreview(null);
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour du stock:', error);
-    }
-  };
-
-  const handleDeleteItem = async (stockId) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet article ?')) {
-      try {
-        await api.delete(`/admin/stock/${stockId}`);
-        setStock(stock.filter(item => item.id !== stockId));
-      } catch (error) {
-        console.error('Erreur lors de la suppression du stock:', error);
+      if (isEditing) {
+        await apiFetch(`/admin/stock/${current.id}`, { method: 'PUT', token, body: form });
+      } else {
+        await apiFetch('/admin/stock', { method: 'POST', token, body: form });
       }
+      closeModal();
+      fetchStock();
+    } catch (err) {
+      setError(err?.data?.msg || err?.data?.error || err?.message || 'Erreur lors de la soumission.');
     }
   };
 
-  const downloadCSV = () => {
-    const headers = ['ID, Reward ID, Nom, Quantité, Prix (jetons), Prix unitaire (FCFA), Catégorie, Image URL'];
-    const rows = stock.map(item =>
-      `${item.id}, ${item.reward_id}, "${item.name}", ${item.quantity_available}, ${item.price_tokens}, ${item.unit_price_fcfa}, "${item.category || ''}", "${item.image_url || ''}"`
-    );
-    const csv = [headers, ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'stock.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const handleDelete = async (id) => {
+    if (!window.confirm('Supprimer ce lot ?')) return;
+    try {
+      await apiFetch(`/admin/stock/${id}`, { method: 'DELETE', token });
+      fetchStock();
+    } catch (err) {
+      setError(err?.data?.msg || err?.data?.error || err?.message || 'Erreur lors de la suppression.');
+    }
   };
 
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedStock = stock.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(stock.length / itemsPerPage);
+  // Recherche et pagination
+  const filtered = stock.filter(item =>
+    item.libelle?.toLowerCase().includes(search.toLowerCase()) ||
+    item.category_id?.toString().includes(search)
+  );
+  const itemsPerPage = 8;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-semibold text-gray-800 mb-6">Gestion des stocks</h1>
-
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-7xl mx-auto w-full animate-fade-in-up">
+      <PageHeader
+        title="Gestion du stock"
+        description="Ajoutez, modifiez ou supprimez les lots/récompenses."
+        icon={Package}
+        gradient="from-gray-700 to-gray-900"
+      >
         <button
-          onClick={() => setIsAdding(!isAdding)}
-          className="px-6 py-2 bg-[#5c669a] text-white rounded hover:bg-[#262e55] transition duration-200"
+          onClick={openAdd}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold shadow flex items-center gap-2"
         >
-          Ajouter un article
+          <Plus size={18} /> Ajouter
         </button>
-        <button
-          onClick={downloadCSV}
-          className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition duration-200"
-        >
-          Télécharger CSV
-        </button>
+      </PageHeader>
+      <div className="mb-4 flex flex-col md:flex-row md:items-center gap-2">
+        <input
+          type="text"
+          placeholder="Rechercher par libellé, catégorie..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          className="w-full md:w-72 px-4 py-2 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        />
       </div>
-
-      {isAdding && (
-        <form onSubmit={handleAddItem} className="bg-white p-6 rounded-lg shadow-lg mb-6" encType="multipart/form-data">
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">Ajouter un nouvel article</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-600">ID de la récompense</label>
-              <input
-                type="number"
-                name="reward_id"
-                placeholder="ID de la récompense"
-                value={newItem.reward_id}
-                onChange={handleInputChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-600">Nom de l'article</label>
-              <input
-                type="text"
-                name="name"
-                placeholder="Nom de l'article"
-                value={newItem.name}
-                onChange={handleInputChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-600">Quantité</label>
-              <input
-                type="number"
-                name="quantity_available"
-                placeholder="Quantité"
-                value={newItem.quantity_available}
-                onChange={handleInputChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-600">Prix (jetons)</label>
-              <input
-                type="number"
-                name="price_tokens"
-                step="0.01"
-                placeholder="Prix (jetons)"
-                value={newItem.price_tokens}
-                onChange={handleInputChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-600">Prix unitaire (FCFA)</label>
-              <input
-                type="number"
-                name="unit_price_fcfa"
-                step="0.01"
-                placeholder="Prix unitaire (FCFA)"
-                value={newItem.unit_price_fcfa}
-                onChange={handleInputChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-600">Catégorie (optionnel)</label>
-              <input
-                type="text"
-                name="category"
-                placeholder="Catégorie"
-                value={newItem.category}
-                onChange={handleInputChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-600">Image</label>
-              <input
-                type="file"
-                name="image"
-                accept="image/png, image/jpeg, image/gif"
-                onChange={handleImageChange}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-              {imagePreview && (
-                <div className="mt-2">
-                  <img src={imagePreview} alt="Aperçu" className="h-20 w-20 object-cover rounded" />
-                </div>
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">{error}</div>}
+      <ModernTable
+        headers={["Image", "Libellé", "Jetons", "Stock", "Catégorie", "Actions"]}
+        loading={loading}
+        emptyMessage="Aucun lot trouvé."
+      >
+        {paginated.map(item => (
+          <tr key={item.id}>
+            <td className="px-6 py-4">
+              {item.recompense_image || item.image ? (
+                <img src={item.recompense_image || item.image} alt={item.libelle} className="h-12 w-12 object-cover rounded shadow" />
+              ) : (
+                <span className="text-gray-400 italic">Aucune</span>
               )}
-            </div>
-          </div>
-          <div className="flex justify-end mt-4">
-            <button
-              type="submit"
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
-            >
-              <Plus size={18} className="mr-2" />
-              Ajouter
-            </button>
+            </td>
+            <td className="px-6 py-4">{item.libelle}</td>
+            <td className="px-6 py-4">{item.jetons}</td>
+            <td className="px-6 py-4 flex items-center gap-2">
+              <StatusBadge status={item.stock > 10 ? 'OK' : item.stock > 0 ? 'Faible' : 'Épuisé'} type={item.stock > 10 ? 'success' : item.stock > 0 ? 'warning' : 'error'} />
+              <span>{item.stock}</span>
+              {item.stock <= 5 && <AlertTriangle size={14} className="text-yellow-500" />}
+            </td>
+            <td className="px-6 py-4">{item.category || item.category_id}</td>
+            <td className="px-6 py-4 flex gap-2">
+              <button onClick={() => openEdit(item)} className="text-blue-600 hover:underline"><Edit size={18} /></button>
+              <button onClick={() => handleDelete(item.id)} className="text-red-600 hover:underline"><Trash2 size={18} /></button>
+            </td>
+          </tr>
+        ))}
+      </ModernTable>
+      <div className="flex justify-center mt-6 gap-2">
+        {Array.from({ length: totalPages }, (_, i) => (
+          <button
+            key={i}
+            onClick={() => setPage(i + 1)}
+            className={`px-3 py-1 rounded ${page === i + 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          >
+            {i + 1}
+          </button>
+        ))}
+      </div>
+      <ModernModal
+        isOpen={showModal}
+        onClose={closeModal}
+        title={isEditing ? 'Modifier le lot' : 'Ajouter un lot'}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input type="text" name="libelle" value={form.libelle} onChange={handleChange} placeholder="Libellé" className="px-3 py-2 border rounded-lg w-full" required />
+          <input type="number" name="jetons" value={form.jetons} onChange={handleChange} placeholder="Jetons" className="px-3 py-2 border rounded-lg w-full" required min="0" />
+          <input type="number" name="stock" value={form.stock} onChange={handleChange} placeholder="Stock" className="px-3 py-2 border rounded-lg w-full" required min="0" />
+          <input type="text" name="category_id" value={form.category_id} onChange={handleChange} placeholder="Catégorie (ID ou nom)" className="px-3 py-2 border rounded-lg w-full" />
+          <input type="text" name="image_url" value={form.image_url} onChange={handleChange} placeholder="URL de l'image" className="px-3 py-2 border rounded-lg w-full" />
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={closeModal} className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Annuler</button>
+            <button type="submit" className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg">{isEditing ? 'Enregistrer' : 'Créer'}</button>
           </div>
         </form>
-      )}
-
-      
-        <div className="mt-6 bg-white rounded-lg shadow-md">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Image</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Nom</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Catégorie</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Quantité</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Prix (jetons)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Prix unitaire (FCFA)</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedStock.map(item => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editItem?.id === item.id ? (
-                      <div>
-                        <input
-                          type="file"
-                          name="image"
-                          accept="image/png, image/jpeg, image/gif"
-                          onChange={handleImageChange}
-                          className="p-2 border rounded"
-                        />
-                        {imagePreview && (
-                          <div className="mt-2">
-                            <img src={imagePreview} alt="Aperçu" className="h-10 w-10 object-cover rounded" />
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <img
-                        src={`http://localhost:5000${item.image_url}`}
-                        alt={item.name}
-                        className="h-10 w-10 object-cover rounded"
-                        onError={(e) => e.target.src = 'https://via.placeholder.com/40'}
-                      />
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editItem?.id === item.id ? (
-                      <input
-                        type="text"
-                        name="name"
-                        value={editItem.name}
-                        onChange={handleInputChange}
-                        className="p-2 border rounded w-full"
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-900">{item.name}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editItem?.id === item.id ? (
-                      <input
-                        type="text"
-                        name="category"
-                        value={editItem.category || ''}
-                        onChange={handleInputChange}
-                        className="p-2 border rounded w-full"
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-900">{item.category || 'N/A'}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editItem?.id === item.id ? (
-                      <input
-                        type="number"
-                        name="quantity_available"
-                        value={editItem.quantity_available}
-                        onChange={handleInputChange}
-                        className="p-2 border rounded w-full"
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-900">{item.quantity_available}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editItem?.id === item.id ? (
-                      <input
-                        type="number"
-                        name="price_tokens"
-                        step="0.01"
-                        value={editItem.price_tokens}
-                        onChange={handleInputChange}
-                        className="p-2 border rounded w-full"
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-900">{item.price_tokens}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editItem?.id === item.id ? (
-                      <input
-                        type="number"
-                        name="unit_price_fcfa"
-                        step="0.01"
-                        value={editItem.unit_price_fcfa}
-                        onChange={handleInputChange}
-                        className="p-2 border rounded w-full"
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-900">{item.unit_price_fcfa} FCFA</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    {editItem?.id === item.id ? (
-                      <button onClick={handleSaveEdit} className="text-green-600 hover:text-green-800">
-                        <Check size={18} />
-                      </button>
-                    ) : (
-                      <button onClick={() => handleEditItem(item)} className="text-blue-600 hover:text-blue-800">
-                        <Edit size={18} />
-                      </button>
-                    )}
-                    <button onClick={() => handleDeleteItem(item.id)} className="text-red-600 hover:text-red-800">
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      
-
-      <div className="flex justify-between items-center mt-4">
-        <div className="text-sm text-gray-600">
-          Affichage de {startIndex + 1} à {Math.min(startIndex + itemsPerPage, stock.length)} sur {stock.length} articles
-        </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            aria-label="Page précédente"
-          >
-            Précédent
-          </button>
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            aria-label="Page suivante"
-          >
-            Suivant
-          </button>
-        </div>
-      </div>
+      </ModernModal>
     </div>
   );
 };
 
-export default StockManagement;
+export default StockManagement; 
