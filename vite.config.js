@@ -6,12 +6,25 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    proxy: {
-      '/api': {
-        target: 'http://192.168.0.200:5000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+    port: 3000
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          lucide: ['lucide-react']
+        }
       }
-    }
-  } 
+    },
+    chunkSizeWarningLimit: 1000
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 3000
+  }
 }) 
