@@ -21,40 +21,40 @@ const Empty = ({ title }) => <div className="text-center text-2xl text-gray-400 
 function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/"
-          element={
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/"
+              element={
             <PrivateRoute>
-              <Layout />
+                  <Layout />
             </PrivateRoute>
-          }
-        >
-          <Route index element={<Dashboard />} />
-          <Route path="dashboard" element={<Dashboard />} />
+              }
+            >
+              <Route index element={<Dashboard />} />
+              <Route path="dashboard" element={<Dashboard />} />
           <Route path="admins" element={<AdminManagement />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="orders" element={<OrderManagement />} />
-          <Route path="stock" element={<StockManagement />} />
+              <Route path="users" element={<UserManagement />} />
+              <Route path="orders" element={<OrderManagement />} />
+              <Route path="stock" element={<StockManagement />} />
           <Route path="notifications" element={<NotificationPanel />} />
           <Route path="faqs" element={<FAQManagement />} />
           <Route path="surveys" element={<SurveyManagement />} />
           <Route path="survey-response" element={<SurveyResponse />} />
           <Route path="advertisements" element={<AdvertisementManagement />} />
-          <Route path="referrals" element={<ReferralManagement />} />
+              <Route path="referrals" element={<ReferralManagement />} />
           <Route path="profile" element={<Profile />} />
-          <Route
+              <Route
             path="stock"
-            element={
+                element={
               <PrivateRoute>
                 <StockManagement />
               </PrivateRoute>
-            }
-          />
-        </Route>
+                }
+              />
+            </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+          </Routes>
     </Router>
   );
 }

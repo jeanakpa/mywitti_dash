@@ -53,7 +53,7 @@ const SurveyManagement = () => {
 
   useEffect(() => {
     if (token) {
-      fetchSurveys();
+    fetchSurveys();
     }
   }, [token]);
 
@@ -227,7 +227,7 @@ const SurveyManagement = () => {
         emptyMessage="Aucun sondage trouvé."
       >
         {paginated.map(survey => (
-          <tr key={survey.id}>
+            <tr key={survey.id}>
             <td className="px-6 py-4">
               <div>
                 <div className="font-semibold text-gray-800">{survey.title}</div>
@@ -263,14 +263,14 @@ const SurveyManagement = () => {
 
             <td className="px-6 py-4">
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => openResponses(survey)} 
                   className="text-blue-600 hover:underline" 
                   title="Voir les réponses"
                 >
                   <Eye size={18} />
                 </button>
-                <button 
+                <button
                   onClick={() => openEdit(survey)} 
                   className="text-green-600 hover:underline" 
                   title="Modifier"
@@ -285,17 +285,17 @@ const SurveyManagement = () => {
                 >
                   <Send size={18} />
                 </button>
-                <button 
-                  onClick={() => handleDelete(survey.id)} 
+                <button
+                  onClick={() => handleDelete(survey.id)}
                   className="text-red-600 hover:underline" 
                   title="Supprimer"
                 >
                   <Trash2 size={18} />
                 </button>
               </div>
-            </td>
-          </tr>
-        ))}
+              </td>
+            </tr>
+          ))}
       </ModernTable>
 
       <div className="flex justify-center mt-6 gap-2">
@@ -434,7 +434,7 @@ const SurveyManagement = () => {
                     <span className="font-medium">Créé le:</span> {formatDate(current.createdAt)}
                   </div>
                 </div>
-              </div>
+          </div>
 
               <div className="space-y-3">
                 <h4 className="font-semibold">Questions et réponses</h4>
@@ -462,7 +462,7 @@ const SurveyManagement = () => {
                     </div>
                   </div>
                 ))}
-              </div>
+          </div>
             </>
           )}
         </div>
@@ -471,4 +471,4 @@ const SurveyManagement = () => {
   );
 };
 
-export default SurveyManagement; 
+export default SurveyManagement;

@@ -35,33 +35,33 @@ const Header = ({ toggleSidebar }) => {
   return (
     <header className="bg-white/80 backdrop-blur-xl shadow-lg border-b border-white/20 h-20 flex items-center px-6 z-20 sticky top-0">
       <div className="flex items-center gap-6 flex-1">
-        <button
-          onClick={toggleSidebar}
+          <button 
+            onClick={toggleSidebar}
           className="p-3 rounded-2xl text-gray-600 hover:text-purple-600 hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 focus:outline-none md:hidden transition-all duration-300"
           aria-label="Ouvrir la navigation"
-        >
-          <Menu size={24} />
-        </button>
-        
+          >
+            <Menu size={24} />
+          </button>
+          
         {/* Logo et titre */}
         <div className="flex items-center gap-4">
           <div className="relative">
             <img src={witti_logo} alt="Logo MyWitti" className="h-12 w-auto drop-shadow-lg hidden sm:block border-radius-50" />
             <div className="absolute -inset-2 bg-gradient-to-r from-purple-400/20 to-blue-400/20 rounded-full blur-xl" />
-          </div>
+            </div>
           <div className="hidden sm:block">
             <h1 className="font-bold text-2xl bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
               MyWitti
             </h1>
             <p className="text-xs text-gray-500">Administration Panel</p>
           </div>
+          </div>
         </div>
-      </div>
-
+        
       {/* Actions utilisateur */}
       <div className="flex items-center gap-4">
         {/* Bouton notifications */}
-        <button
+            <button 
           className="relative p-3 rounded-2xl hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 text-gray-600 hover:text-purple-600 focus:outline-none transition-all duration-300 group"
           onClick={() => navigate('/admin/notifications')}
         >
@@ -69,10 +69,10 @@ const Header = ({ toggleSidebar }) => {
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full px-2 py-1 font-bold shadow-lg animate-pulse">
               {unreadCount}
-            </span>
-          )}
-        </button>
-
+                </span>
+              )}
+            </button>
+            
         {/* Menu profil */}
         <div className="relative">
           <button
@@ -88,7 +88,7 @@ const Header = ({ toggleSidebar }) => {
               />
               <div className="absolute -inset-1 bg-gradient-to-r from-purple-400/30 to-blue-400/30 rounded-full blur-sm" />
             </div>
-          </button>
+                  </button>
 
           {/* Menu déroulant */}
           {showProfile && (
@@ -100,11 +100,11 @@ const Header = ({ toggleSidebar }) => {
                     <span className="text-white font-semibold text-sm">
                       {user?.name?.charAt(0) || 'A'}
                     </span>
-                  </div>
+                </div>
                   <div>
                     <p className="font-semibold text-gray-800">{user?.name || 'Admin'}</p>
                     <p className="text-sm text-gray-500 capitalize">{user?.role || 'admin'}</p>
-                  </div>
+                    </div>
                 </div>
               </div>
 
@@ -118,15 +118,15 @@ const Header = ({ toggleSidebar }) => {
                   <span>Mon Profil</span>
                 </button>
                 
-                <button
+            <button 
                   onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-6 py-3 text-red-600 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all duration-200"
-                >
+            >
                   <LogOut size={18} />
                   <span>Déconnexion</span>
                 </button>
               </div>
-            </div>
+          </div>
           )}
         </div>
       </div>

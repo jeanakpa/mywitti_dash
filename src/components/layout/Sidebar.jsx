@@ -11,7 +11,7 @@ const MenuItem = ({ path, name, icon, isActive }) => (
       ${isActive 
         ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-xl transform scale-105' 
         : 'text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-blue-50 hover:text-purple-700 hover:shadow-lg hover:transform hover:scale-105'
-      }`}
+    }`}
   >
     {/* Effet de brillance au survol */}
     <div className={`absolute inset-0 bg-gradient-to-r from-white/20 to-transparent transform -skew-x-12 transition-transform duration-500 ${isActive ? 'translate-x-0' : 'translate-x-full group-hover:translate-x-0'}`} />

@@ -52,7 +52,7 @@ const OrderManagement = () => {
         method: 'PUT', 
         token
       });
-      fetchOrders();
+    fetchOrders();
     } catch (err) {
       setError(err?.data?.msg || err?.data?.error || err?.message || 'Erreur lors de l\'annulation.');
     }
@@ -131,11 +131,11 @@ const OrderManagement = () => {
               ) : (
                 <span className="text-gray-400 italic">Aucun article</span>
               )}
-            </td>
+                  </td>
             <td className="px-6 py-4">{order.amount} jetons</td>
             <td className="px-6 py-4">
               <StatusBadge status={statusMap[order.status]?.label || order.status} type={statusMap[order.status]?.type || 'default'} />
-            </td>
+                  </td>
             <td className="px-6 py-4">{order.date}</td>
             <td className="px-6 py-4 flex gap-2">
               <button 
@@ -147,7 +147,7 @@ const OrderManagement = () => {
                 title={order.status === 'validated' ? 'Déjà validée' : order.status === 'cancelled' ? 'Commande annulée' : 'Valider'}
               >
                 <CheckCircle size={18} />
-              </button>
+                    </button>
               <button 
                 onClick={() => handleCancel(order)} 
                 disabled={order.status === 'validated' || order.status === 'cancelled'}
@@ -157,9 +157,9 @@ const OrderManagement = () => {
                 title={order.status === 'validated' ? 'Commande validée' : order.status === 'cancelled' ? 'Déjà annulée' : 'Annuler'}
               >
                 <XCircle size={18} />
-              </button>
-            </td>
-          </tr>
+                    </button>
+                  </td>
+                </tr>
         ))}
       </ModernTable>
       <div className="flex justify-center mt-6 gap-2">
@@ -177,4 +177,4 @@ const OrderManagement = () => {
   );
 };
 
-export default OrderManagement; 
+export default OrderManagement;

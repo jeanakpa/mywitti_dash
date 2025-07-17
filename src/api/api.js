@@ -1,6 +1,6 @@
 // Utilitaire pour les appels API sécurisés avec JWT
 // Modifie ici la base URL de l'API si besoin
-const API_BASE_URL = 'https://apimywitti-15.onrender.com/';
+const API_BASE_URL = 'http://localhost:5000/';
 
 export async function apiFetch(endpoint, { method = 'GET', body, token, ...options } = {}) {
   const headers = {

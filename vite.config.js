@@ -18,13 +18,13 @@ export default defineConfig({
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
           lucide: ['lucide-react']
-        }
       }
+    }
     },
     chunkSizeWarningLimit: 1000
   },
   preview: {
     host: '0.0.0.0',
     port: 3000
-  }
+  } 
 }) 

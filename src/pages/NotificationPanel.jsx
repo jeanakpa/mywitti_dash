@@ -16,7 +16,7 @@ const NotificationPanel = () => {
 
   useEffect(() => { fetchNotifications(); }, [token]);
 
-  const fetchNotifications = async () => {
+    const fetchNotifications = async () => {
     setLoading(true); setError('');
     try {
       const data = await apiFetch('/admin/notifications', { token });
@@ -45,7 +45,7 @@ const NotificationPanel = () => {
     try {
       await apiFetch(`/admin/notifications/${notif.id}`, { method: 'DELETE', token });
       fetchNotifications();
-    } catch (err) {
+      } catch (err) {
       setError('Erreur lors de la suppression.');
     }
   };
@@ -106,11 +106,11 @@ const NotificationPanel = () => {
             className={`px-3 py-1 rounded ${page === i + 1 ? 'bg-yellow-500 text-white' : 'bg-gray-200 text-gray-700'}`}
           >
             {i + 1}
-          </button>
+      </button>
         ))}
-      </div>
+        </div>
     </div>
   );
 };
 
-export default NotificationPanel; 
+export default NotificationPanel;

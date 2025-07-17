@@ -357,7 +357,7 @@ const Dashboard = () => {
       console.log('Aucune récompense populaire trouvée dans les commandes validées');
       return;
     }
-    
+
     const labels = popularRewards.map(r => r.libelle);
     const values = popularRewards.map(r => r.count);
     
@@ -368,18 +368,18 @@ const Dashboard = () => {
     if (rewardsChartRef.current) {
       rewardsChartInstance.current = new Chart(rewardsChartRef.current, {
         type: 'doughnut',
-        data: {
+      data: {
           labels,
-          datasets: [{
+        datasets: [{
             data: values,
             backgroundColor: [
               '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'
             ],
             borderWidth: 0,
             borderRadius: 8,
-          }],
-        },
-        options: {
+        }],
+      },
+      options: {
           plugins: {
             legend: { 
               position: 'bottom', 
@@ -399,10 +399,10 @@ const Dashboard = () => {
             },
           },
           cutout: '60%',
-          responsive: true,
+        responsive: true,
           maintainAspectRatio: false,
-        },
-      });
+      },
+    });
     }
   }, [orders]);
 
@@ -418,19 +418,19 @@ const Dashboard = () => {
     if (stockChartInstance.current) stockChartInstance.current.destroy();
     if (stockChartRef.current) {
       stockChartInstance.current = new Chart(stockChartRef.current, {
-        type: 'doughnut',
-        data: {
+      type: 'doughnut',
+      data: {
           labels,
-          datasets: [{
+        datasets: [{
             data: values,
             backgroundColor: [
               '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#fa709a', '#fee140'
             ],
             borderWidth: 0,
             borderRadius: 8,
-          }],
-        },
-        options: {
+        }],
+      },
+      options: {
           plugins: {
             legend: { 
               position: 'bottom', 
@@ -450,10 +450,10 @@ const Dashboard = () => {
             },
           },
           cutout: '60%',
-          responsive: true,
+        responsive: true,
           maintainAspectRatio: false,
-        },
-      });
+      },
+    });
     }
   }, [stock]);
 
@@ -836,7 +836,7 @@ const Dashboard = () => {
                             Commandes validées: {orders.filter(o => o.status === 'validated').length}
                           </p>
                         </div>
-                      </div>
+                    </div>
                     );
                   }
                   
@@ -895,8 +895,8 @@ const Dashboard = () => {
                   
                   return <canvas ref={rewardsChartRef} />;
                 })()}
-              </div>
-            </div>
+                    </div>
+                  </div>
             
             <div className="modern-card p-8">
               <div className="flex items-center justify-between mb-6">
@@ -965,4 +965,4 @@ const ActivityItem = ({ icon: Icon, title, description, time, color }) => {
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

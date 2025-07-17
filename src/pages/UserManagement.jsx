@@ -29,7 +29,7 @@ const UserManagement = () => {
     try {
       const data = await apiFetch('/admin/customers', { token });
       setClients(Array.isArray(data) ? data : []);
-    } catch (err) {
+      } catch (err) {
       setError(err?.data?.msg || err?.data?.error || err?.message || 'Erreur lors du chargement.');
     } finally { setLoading(false); }
   };
@@ -100,8 +100,8 @@ const UserManagement = () => {
         {/* Bouton d'ajout retiré */}
       </PageHeader>
       <div className="mb-4 flex flex-col md:flex-row md:items-center gap-2">
-        <input
-          type="text"
+          <input
+            type="text"
           placeholder="Rechercher par nom, code, email..."
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1); }}
@@ -127,9 +127,9 @@ const UserManagement = () => {
             <td className="px-6 py-4 flex gap-2">
               <button onClick={() => openEdit(client)} className="text-blue-600 hover:underline"><Edit size={18} /></button>
               <button onClick={() => handleDelete(client.id)} className="text-red-600 hover:underline"><Trash2 size={18} /></button>
-            </td>
-          </tr>
-        ))}
+                </td>
+              </tr>
+            ))}
       </ModernTable>
       <div className="flex justify-center mt-6 gap-2">
         {Array.from({ length: totalPages }, (_, i) => (
@@ -192,4 +192,4 @@ const UserManagement = () => {
   );
 };
 
-export default UserManagement; 
+export default UserManagement;
